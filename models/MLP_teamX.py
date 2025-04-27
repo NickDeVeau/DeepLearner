@@ -42,12 +42,18 @@ class MLP:
         self.lr = lr
         for epoch in range(epochs):
             total_loss = 0
+            first_batch = True
             for X_batch, y_batch in loader_fn():
                 output = self.forward(X_batch)
                 loss = cross_entropy_loss(output, y_batch)
                 total_loss += loss
                 self.backward(X_batch, y_batch, output)
-            print(f"Epoch {epoch+1}/{epochs} - Loss: {total_loss:.4f}")
+
+                if first_batch:
+                    print(f"Epoch {epoch+1} - Sample MLP Output Predictions: {np.argmax(output[:5], axis=1)}")
+                    print(f"Epoch {epoch+1} - Ground Truth: {np.argmax(y_batch[:5], axis=1)}")
+                    first_batch = False
+            print(f"Epoch {epoch+1}/{epochs} - Total Loss: {total_loss:.4f}")
 
     def predict(self, X):
         output = self.forward(X)
@@ -55,9 +61,14 @@ class MLP:
 
     def evaluate(self, loader):
         correct = total = 0
+        first_batch = True
         for X_batch, y_batch in loader:
             preds = self.predict(X_batch)
             labels = np.argmax(y_batch, axis=1)
+            if first_batch:
+                print(f"Sample Test Predictions: {preds[:5]}")
+                print(f"Sample Test Labels: {labels[:5]}")
+                first_batch = False
             correct += (preds == labels).sum()
             total += len(y_batch)
         print(f"Test Accuracy: {correct / total * 100:.2f}%")
