@@ -1,4 +1,73 @@
-venv/
+# ──────────────────────────────────────────────
+#  Python / VS Code / Conda
+# ──────────────────────────────────────────────
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.env
+.venv
+.idea/
+.vscode/
+.history/
+
+# Conda‐env metadata (if you export it)
+conda-meta/
+*.conda
+*.ipynb_checkpoints/
+
+# Jupyter run-time
+.ipynb_checkpoints/
+.profile_default/
+.qt/
+
+# ──────────────────────────────────────────────
+#  OS-generated cruft
+# ──────────────────────────────────────────────
 .DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+*.swp
+*~
+
+# ──────────────────────────────────────────────
+#  Project-specific
+# ──────────────────────────────────────────────
+# Raw MNIST downloads & extracted IDX files
+data/
+#  (If you want “data” committed, remove the line above
+#   and instead ignore only the large IDX files)
+# data/*-images-idx*.gz
+# data/*-labels-idx*.gz
+# data/*-images-idx*
+# data/*-labels-idx*
+
+# Trained model weights / checkpoints
+checkpoints/
+*.npz
+*.npy
+
+# Logs / temp
+logs/
+*.log
+*.tmp
+*.out
+
+# ──────────────────────────────────────────────
+#  Build artifacts (if any)
+# ──────────────────────────────────────────────
+dist/
+build/
+*.o
+*.a
+*.dll
+*.dylib
+*.exe
+
+# ──────────────────────────────────────────────
+#  VS Code Remote-SSH cache (optional)
+# ──────────────────────────────────────────────
+.vscode-server/
