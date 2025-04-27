@@ -1,7 +1,6 @@
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 import numpy as np
 import torch
 from torchvision import datasets, transforms
@@ -9,13 +8,11 @@ from torch.utils.data import DataLoader
 from utils.activations import softmax
 from utils.loss import cross_entropy_loss
 
-
 def relu(x):
     return np.maximum(0, x)
 
 def relu_derivative(x):
     return (x > 0).astype(float)
-
 
 class CNN:
     def __init__(self, input_shape=(28, 28), kernel_size=3, output_size=10):
@@ -29,7 +26,6 @@ class CNN:
         self.W_fc = np.random.randn(self.fc_input_size, output_size).astype(np.float32) * 0.1
         self.b_fc = np.zeros((1, output_size), dtype=np.float32)
 
-    # ------------------------------ forward ------------------------------
     def convolve2d(self, image, kernel):
         kh, kw = kernel.shape
         ih, iw = image.shape
@@ -46,20 +42,18 @@ class CNN:
         self.flat = self.relu_out.reshape(self.batch_size, -1)
         self.logits = np.dot(self.flat, self.W_fc) + self.b_fc
         probs = softmax(self.logits)
-        self.probs = np.clip(probs, 1e-8, 1 - 1e-8)  # numerical stability
+        self.probs = np.clip(probs, 1e-8, 1 - 1e-8)
         return self.probs
 
-    # ------------------------------ backward -----------------------------
     def backward(self, X, y, output):
         m = X.shape[0]
-        d_logits = output - y                       # [m, 10]
-        dW_fc = np.dot(self.flat.T, d_logits) / m   # [fc_in,10]
+        d_logits = output - y
+        dW_fc = np.dot(self.flat.T, d_logits) / m
         db_fc = np.sum(d_logits, axis=0, keepdims=True) / m
 
-        d_flat = np.dot(d_logits, self.W_fc.T)                      # [m, fc_in]
+        d_flat = np.dot(d_logits, self.W_fc.T)
         d_relu = d_flat.reshape(self.relu_out.shape) * relu_derivative(self.conv_out)
 
-        # gradient w.r.t kernel
         d_kernel = np.zeros_like(self.kernel)
         for i in range(m):
             img = X[i]
@@ -71,15 +65,12 @@ class CNN:
         d_kernel /= m
         d_bias_conv = np.sum(d_relu) / m
 
-        # parameter update
         self.W_fc -= self.lr * dW_fc
         self.b_fc -= self.lr * db_fc
         self.kernel -= self.lr * d_kernel
         self.bias_conv -= self.lr * d_bias_conv
 
-    # ------------------------------ training helpers --------------------
     def train(self, loader_fn, epochs=5, lr=0.001):
-        """`loader_fn` must return a *fresh* generator each epoch."""
         self.lr = lr
         for epoch in range(epochs):
             total_loss = 0.0
@@ -102,14 +93,8 @@ class CNN:
             total += len(y_batch)
         print(f"Test Accuracy: {correct / total * 100:.2f}%")
 
-
-# ------------------------------ utility ------------------------------
-
 def one_hot(labels, num_classes=10):
     return np.eye(num_classes, dtype=np.float32)[labels]
-
-
-# ------------------------------ main ------------------------------
 
 def main():
     transform = transforms.Compose([
@@ -123,7 +108,6 @@ def main():
     train_loader_pt = DataLoader(train_ds, batch_size=128, shuffle=True)
     test_loader_pt = DataLoader(test_ds, batch_size=128, shuffle=False)
 
-    # wrapper that yields NumPy batches (fresh generator each call)
     def to_numpy_loader(pt_loader):
         for imgs, labels in pt_loader:
             yield imgs.squeeze().numpy(), one_hot(labels.numpy())
@@ -131,7 +115,6 @@ def main():
     model = CNN()
     model.train(lambda: to_numpy_loader(train_loader_pt), epochs=5, lr=0.001)
     model.evaluate(to_numpy_loader(test_loader_pt))
-
 
 if __name__ == '__main__':
     main()
