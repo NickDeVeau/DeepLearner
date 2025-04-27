@@ -67,6 +67,11 @@ build/
 *.dylib
 *.exe
 
+# Log files
+*.log
+mlp_training_log.txt
+cnn_training_log.txt
+
 # ──────────────────────────────────────────────
 #  VS Code Remote-SSH cache (optional)
 # ──────────────────────────────────────────────

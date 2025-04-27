@@ -1,21 +1,22 @@
 import sys
 import os
+import logging
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import numpy as np
 import torch
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
-from utils.activations import softmax
+from utils.activations import relu, softmax
 from utils.loss import cross_entropy_loss
 
-def relu(x):
-    return np.maximum(0, x)
-
-def relu_derivative(x):
-    return (x > 0).astype(float)
+# Setup logger
+logging.basicConfig(filename='cnn_training_log.txt', level=logging.INFO, filemode='w')
+logger = logging.getLogger()
 
 class CNN:
     def __init__(self, input_shape=(28, 28), kernel_size=3, output_size=10):
+        logger.info(f"Initializing CNN model: input_shape={input_shape}, kernel_size={kernel_size}, output_size={output_size}")
         self.kernel_size = kernel_size
         self.kernel = np.random.randn(kernel_size, kernel_size).astype(np.float32) * 0.1
         self.bias_conv = 0.0
@@ -29,13 +30,14 @@ class CNN:
     def convolve2d(self, image, kernel):
         kh, kw = kernel.shape
         ih, iw = image.shape
-        out = np.zeros((ih - kh + 1, iw - kw + 1), dtype=np.float32)
-        for i in range(out.shape[0]):
-            for j in range(out.shape[1]):
-                out[i, j] = np.sum(image[i:i + kh, j:j + kw] * kernel)
-        return out
+        output = np.zeros((ih - kh + 1, iw - kw + 1), dtype=np.float32)
+        for i in range(output.shape[0]):
+            for j in range(output.shape[1]):
+                output[i, j] = np.sum(image[i:i+kh, j:j+kw] * kernel)
+        return output
 
     def forward(self, X):
+        logger.info(f"CNN forward pass: input batch shape {X.shape}")
         self.batch_size = X.shape[0]
         self.conv_out = np.array([self.convolve2d(img, self.kernel) + self.bias_conv for img in X], dtype=np.float32)
         self.relu_out = relu(self.conv_out)
@@ -43,16 +45,18 @@ class CNN:
         self.logits = np.dot(self.flat, self.W_fc) + self.b_fc
         probs = softmax(self.logits)
         self.probs = np.clip(probs, 1e-8, 1 - 1e-8)
+        logger.info(f"CNN forward pass completed: output shape {self.probs.shape}")
         return self.probs
 
     def backward(self, X, y, output):
+        logger.info(f"CNN backward pass: input shape {X.shape}, output shape {output.shape}")
         m = X.shape[0]
         d_logits = output - y
         dW_fc = np.dot(self.flat.T, d_logits) / m
         db_fc = np.sum(d_logits, axis=0, keepdims=True) / m
 
         d_flat = np.dot(d_logits, self.W_fc.T)
-        d_relu = d_flat.reshape(self.relu_out.shape) * relu_derivative(self.conv_out)
+        d_relu = d_flat.reshape(self.relu_out.shape) * (self.conv_out > 0).astype(float)
 
         d_kernel = np.zeros_like(self.kernel)
         for i in range(m):
@@ -60,7 +64,7 @@ class CNN:
             err = d_relu[i]
             for h in range(self.kernel.shape[0]):
                 for w in range(self.kernel.shape[1]):
-                    patch = img[h:h + err.shape[0], w:w + err.shape[1]]
+                    patch = img[h:h+err.shape[0], w:w+err.shape[1]]
                     d_kernel[h, w] += np.sum(patch * err)
         d_kernel /= m
         d_bias_conv = np.sum(d_relu) / m
@@ -69,40 +73,37 @@ class CNN:
         self.b_fc -= self.lr * db_fc
         self.kernel -= self.lr * d_kernel
         self.bias_conv -= self.lr * d_bias_conv
+        logger.info(f"CNN backward pass completed.")
 
     def train(self, loader_fn, epochs=5, lr=0.001):
         self.lr = lr
+        logger.info(f"Starting CNN training: epochs={epochs}, learning_rate={lr}")
         for epoch in range(epochs):
-            total_loss = 0.0
-            first_batch = True
-            for X_batch, y_batch in loader_fn():
+            total_loss = 0
+            for batch_idx, (X_batch, y_batch) in enumerate(loader_fn()):
                 out = self.forward(X_batch)
                 loss = cross_entropy_loss(out, y_batch)
                 total_loss += loss
                 self.backward(X_batch, y_batch, out)
-
-                if first_batch:
-                    print(f"Epoch {epoch+1} - Sample CNN Output Predictions: {np.argmax(out[:5], axis=1)}")
-                    print(f"Epoch {epoch+1} - Ground Truth: {np.argmax(y_batch[:5], axis=1)}")
-                    first_batch = False
-            print(f"Epoch {epoch + 1}/{epochs} - Total Loss: {total_loss:.4f}")
+                logger.info(f"Epoch {epoch+1} Batch {batch_idx+1} Loss: {loss:.6f}")
+            print(f"Epoch {epoch+1}/{epochs} - Total Loss: {total_loss:.4f}")
 
     def predict(self, X):
-        return np.argmax(self.forward(X), axis=1)
+        logger.info(f"CNN prediction on batch shape {X.shape}")
+        output = self.forward(X)
+        return np.argmax(output, axis=1)
 
     def evaluate(self, loader):
         correct = total = 0
-        first_batch = True
-        for X_batch, y_batch in loader:
+        for batch_idx, (X_batch, y_batch) in enumerate(loader):
             preds = self.predict(X_batch)
             labels = np.argmax(y_batch, axis=1)
-            if first_batch:
-                print(f"Sample Test Predictions: {preds[:5]}")
-                print(f"Sample Test Labels: {labels[:5]}")
-                first_batch = False
             correct += (preds == labels).sum()
             total += len(y_batch)
-        print(f"Test Accuracy: {correct / total * 100:.2f}%")
+            logger.info(f"Evaluating batch {batch_idx+1}")
+        accuracy = correct / total
+        print(f"Test Accuracy: {accuracy * 100:.2f}%")
+        logger.info(f"Final Test Accuracy: {accuracy * 100:.2f}%")
 
 def one_hot(labels, num_classes=10):
     return np.eye(num_classes, dtype=np.float32)[labels]
